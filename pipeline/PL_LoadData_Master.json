@@ -1,0 +1,212 @@
+{
+	"name": "PL_LoadData_Master",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetTableInfo",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "select folderpath,stagingtable,targettable from audit.ETL_Config where isactive =1  and folderpath<>'Sales'",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_Folders",
+						"type": "DatasetReference",
+						"parameters": {
+							"param_staiging_Tablename": {
+								"value": "@variables('StaigingTable')",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "LoopInFolder",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetTableInfo",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetTableInfo').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "SetFolderPath",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "FolderPath",
+								"value": {
+									"value": "@item().FolderPath",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "SetStaigingTable",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "StaigingTable",
+								"value": {
+									"value": "@item().StaigingTable",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "SetTargetTable",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "TargetTable",
+								"value": {
+									"value": "@item().TargetTable",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "TruncateStagingAndFinalTables",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "SetFolderPath",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "SetStaigingTable",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "SetTargetTable",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[stg].[usp_TruncateTable]",
+								"storedProcedureParameters": {
+									"StagingTableName": {
+										"value": {
+											"value": "@variables('StaigingTable')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TargetTableName": {
+										"value": {
+											"value": "@variables('TargetTable')",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_AzureSQL",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "ExecuteChild",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "TruncateStagingAndFinalTables",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_LoadDataChild",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"Foldername": {
+										"value": "@variables('FolderPath')",
+										"type": "Expression"
+									},
+									"StagingTableName": {
+										"value": "@variables('StaigingTable')",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"variables": {
+			"FolderPath": {
+				"type": "String"
+			},
+			"StaigingTable": {
+				"type": "String"
+			},
+			"TargetTable": {
+				"type": "String"
+			}
+		},
+		"annotations": []
+	}
+}

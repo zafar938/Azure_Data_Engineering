@@ -5,9 +5,24 @@
 			"referenceName": "ls_AzureSQL",
 			"type": "LinkedServiceReference"
 		},
+		"parameters": {
+			"param_staiging_Tablename": {
+				"type": "string"
+			}
+		},
 		"annotations": [],
 		"type": "AzureSqlTable",
-		"schema": []
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@split(dataset().param_staiging_Tablename, '.')[0]",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@split(dataset().param_staiging_Tablename, '.')[1]",
+				"type": "Expression"
+			}
+		}
 	},
 	"type": "Microsoft.DataFactory/factories/datasets"
 }

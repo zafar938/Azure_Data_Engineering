@@ -19,7 +19,7 @@
 						"referenceName": "DS_ADLS",
 						"type": "DatasetReference",
 						"parameters": {
-							"param_foldername": {
+							"param_foldermame": {
 								"value": "@pipeline().parameters.param_foldername",
 								"type": "Expression"
 							}
