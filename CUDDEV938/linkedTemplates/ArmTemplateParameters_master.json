@@ -1,0 +1,39 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "CUDDEV938"
+		},
+		"ls_AzureSQL_password": {
+			"value": ""
+		},
+		"ls_adls_accountKey": {
+			"value": ""
+		},
+		"ls_adls1_accountKey": {
+			"value": ""
+		},
+		"ls_AzureSQL_properties_typeProperties_server": {
+			"value": "cudclouddev.database.windows.net"
+		},
+		"ls_AzureSQL_properties_typeProperties_database": {
+			"value": "cudclouddev"
+		},
+		"ls_AzureSQL_properties_typeProperties_userName": {
+			"value": "zafar938"
+		},
+		"ls_adls_properties_typeProperties_url": {
+			"value": "https://cudstorageaccount.dfs.core.windows.net/"
+		},
+		"ls_adls1_properties_typeProperties_url": {
+			"value": "https://cudstorageaccount.dfs.core.windows.net/"
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}
