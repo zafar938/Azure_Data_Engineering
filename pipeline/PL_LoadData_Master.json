@@ -1,0 +1,206 @@
+{
+	"name": "PL_LoadData_Master",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetTableInfo",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "select folderpath,stagingtable,targettable from audit.ETL_Config where isactive =1 and folderpath<>'Sales'",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_Folders",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "LoopInFolders",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetTableInfo",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetTableInfo').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "SetFolderPath",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "FolderPath",
+								"value": {
+									"value": "@item().FolderPath",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "SetStagingTable",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "StagingTable",
+								"value": {
+									"value": "@item().stagingtable",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "SetTableName",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "Tablename",
+								"value": {
+									"value": "@item().targettable",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "TruncateStagingAndFinalTables",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "SetFolderPath",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "SetStagingTable",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "SetTableName",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[stg].[usp_TruncateTable]",
+								"storedProcedureParameters": {
+									"StagingTableName": {
+										"value": {
+											"value": "@variables('StagingTable')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"TargetTableName": {
+										"value": {
+											"value": "@variables('Tablename')",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_AzureSQL",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "ExecuteChild",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "TruncateStagingAndFinalTables",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_LoadDataChild",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"Foldername": {
+										"value": "@variables('FolderPath')",
+										"type": "Expression"
+									},
+									"StagingTableName": {
+										"value": "@item().stagingtable",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"variables": {
+			"Tablename": {
+				"type": "String"
+			},
+			"FolderPath": {
+				"type": "String"
+			},
+			"StagingTable": {
+				"type": "String"
+			}
+		},
+		"annotations": []
+	}
+}

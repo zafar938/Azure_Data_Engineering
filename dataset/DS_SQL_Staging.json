@@ -1,0 +1,27 @@
+{
+	"name": "DS_SQL_Staging",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_AzureSQL",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"param_staging_Tablename": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@split(dataset().param_staging_Tablename,'.' )[0]",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@split(dataset().param_staging_Tablename,'.' )[1]",
+				"type": "Expression"
+			}
+		}
+	}
+}

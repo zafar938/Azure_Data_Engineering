@@ -9,14 +9,7 @@
 		"type": "AzureSqlTable",
 		"schema": [],
 		"typeProperties": {
-			"schema": {
-				"value": "@split(dataset().param_staiging_Tablename, '.')[0]",
-				"type": "Expression"
-			},
-			"table": {
-				"value": "@split(dataset().param_staiging_Tablename, '.')[1]",
-				"type": "Expression"
-			}
+			"schema": ""
 		}
 	},
 	"type": "Microsoft.DataFactory/factories/datasets"
