@@ -110,7 +110,10 @@
 					"type": "LinkedServiceReference"
 				},
 				"parameters": {
-					"param_foldername": {
+					"ParamFolderName": {
+						"type": "string"
+					},
+					"ParamFileName": {
 						"type": "string"
 					}
 				},
@@ -119,8 +122,12 @@
 				"typeProperties": {
 					"location": {
 						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().ParamFileName",
+							"type": "Expression"
+						},
 						"folderPath": {
-							"value": "@dataset().param_foldername",
+							"value": "@dataset().ParamFolderName",
 							"type": "Expression"
 						},
 						"fileSystem": "oprationsdevstatos"
@@ -253,7 +260,41 @@
 				"annotations": [],
 				"type": "AzureSqlTable",
 				"schema": [],
-				"typeProperties": {}
+				"typeProperties": {
+					"schema": ""
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_AzureSQL')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_SQL_Staging')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_AzureSQL",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"param_staging_Tablename": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@split(dataset().param_staging_Tablename,'.' )[0]",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@split(dataset().param_staging_Tablename,'.' )[1]",
+						"type": "Expression"
+					}
+				}
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/linkedServices/ls_AzureSQL')]"
@@ -408,6 +449,224 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_LoadDataChild')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "GetFileInfo",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT FileName FROM audit.FileControl WHERE TableName = '@{pipeline().parameters.StagingTableName}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_Folders",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "LoopInFiles",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "GetFileInfo",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('GetFileInfo').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "SetFileName",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "FileName",
+										"value": {
+											"value": "@item().FileName",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "CopyFromADLSToStaging",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "SetFileName",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"additionalColumns": [
+												{
+													"name": "FileName",
+													"value": "$$FILEPATH"
+												}
+											],
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "insert",
+											"sqlWriterUseTableLock": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_ADLS",
+											"type": "DatasetReference",
+											"parameters": {
+												"ParamFolderName": {
+													"value": "@pipeline().parameters.StagingTableName",
+													"type": "Expression"
+												},
+												"ParamFileName": {
+													"value": "@variables('FileName')",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_SQL_Staging",
+											"type": "DatasetReference",
+											"parameters": {
+												"param_staging_Tablename": {
+													"value": "@pipeline().parameters.StagingTableName",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "RunSCD2",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "LoopInFiles",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[dw].[usp_SCD2_Generic]",
+							"storedProcedureParameters": {
+								"StagingTable": {
+									"value": {
+										"value": "@pipeline().parameters.StagingTableName",
+										"type": "Expression"
+									},
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "ls_AzureSQL",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"Foldername": {
+						"type": "string"
+					},
+					"StagingTableName": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"FileName": {
+						"type": "String"
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Folders')]",
+				"[concat(variables('factoryId'), '/linkedServices/ls_AzureSQL')]",
+				"[concat(variables('factoryId'), '/datasets/DS_ADLS')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_Staging')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_MetaDataChild')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -430,7 +689,11 @@
 								"referenceName": "DS_ADLS",
 								"type": "DatasetReference",
 								"parameters": {
-									"param_foldername": {
+									"ParamFolderName": {
+										"value": "@pipeline().parameters.param_foldername",
+										"type": "Expression"
+									},
+									"ParamFileName": {
 										"value": "@pipeline().parameters.param_foldername",
 										"type": "Expression"
 									}
@@ -606,6 +869,223 @@
 				"[concat(variables('factoryId'), '/datasets/DS_ADLS')]",
 				"[concat(variables('factoryId'), '/datasets/ds_filemeta')]",
 				"[concat(variables('factoryId'), '/linkedServices/ls_AzureSQL')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_LoadData_Master')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "GetTableInfo",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "select folderpath,stagingtable,targettable from audit.ETL_Config where isactive =1 and folderpath<>'Sales'",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_Folders",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "LoopInFolders",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "GetTableInfo",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('GetTableInfo').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "SetFolderPath",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "FolderPath",
+										"value": {
+											"value": "@item().FolderPath",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "SetStagingTable",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "StagingTable",
+										"value": {
+											"value": "@item().stagingtable",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "SetTableName",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "Tablename",
+										"value": {
+											"value": "@item().targettable",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "TruncateStagingAndFinalTables",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "SetFolderPath",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "SetStagingTable",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "SetTableName",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[[stg].[usp_TruncateTable]",
+										"storedProcedureParameters": {
+											"StagingTableName": {
+												"value": {
+													"value": "@variables('StagingTable')",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"TargetTableName": {
+												"value": {
+													"value": "@variables('Tablename')",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_AzureSQL",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "ExecuteChild",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "TruncateStagingAndFinalTables",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL_LoadDataChild",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"Foldername": {
+												"value": "@variables('FolderPath')",
+												"type": "Expression"
+											},
+											"StagingTableName": {
+												"value": "@item().stagingtable",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Tablename": {
+						"type": "String"
+					},
+					"FolderPath": {
+						"type": "String"
+					},
+					"StagingTable": {
+						"type": "String"
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Folders')]",
+				"[concat(variables('factoryId'), '/linkedServices/ls_AzureSQL')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_LoadDataChild')]"
 			]
 		},
 		{
