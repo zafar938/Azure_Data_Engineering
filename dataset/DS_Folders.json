@@ -5,11 +5,6 @@
 			"referenceName": "ls_AzureSQL",
 			"type": "LinkedServiceReference"
 		},
-		"parameters": {
-			"param_staiging_Tablename": {
-				"type": "string"
-			}
-		},
 		"annotations": [],
 		"type": "AzureSqlTable",
 		"schema": [],
