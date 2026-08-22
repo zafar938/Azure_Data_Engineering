@@ -1,0 +1,15 @@
+{
+	"name": "CUDDEV938",
+	"properties": {
+		"trustModeClaimForMi": {
+			"value": "Disabled",
+			"editable": true
+		}
+	},
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "92bc224b-022f-4d3f-83c5-969fdd771aac",
+		"tenantId": "df656b6b-c8ff-486f-9dd4-46ed25a151c4"
+	}
+}

@@ -1,0 +1,13 @@
+{
+	"name": "DS_Folders",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_AzureSQL",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
