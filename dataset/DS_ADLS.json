@@ -6,10 +6,10 @@
 			"type": "LinkedServiceReference"
 		},
 		"parameters": {
-			"param_foldermame": {
+			"ParamFolderName": {
 				"type": "string"
 			},
-			"param_filename": {
+			"ParamFileName": {
 				"type": "string"
 			}
 		},
@@ -19,11 +19,11 @@
 			"location": {
 				"type": "AzureBlobFSLocation",
 				"fileName": {
-					"value": "@dataset().param_filename",
+					"value": "@dataset().ParamFileName",
 					"type": "Expression"
 				},
 				"folderPath": {
-					"value": "@dataset().param_foldermame",
+					"value": "@dataset().ParamFolderName",
 					"type": "Expression"
 				},
 				"fileSystem": "oprationsdevstatos"

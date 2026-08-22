@@ -18,21 +18,11 @@
 					"source": {
 						"type": "AzureSqlSource",
 						"sqlReaderQuery": {
-							"value": "Select FileName from  audit.FileControl TableName ='@\n       {pipeline().parameters.StagingTableName}'",
+							"value": "SELECT FileName FROM audit.FileControl WHERE TableName = '@{pipeline().parameters.Foldername}'",
 							"type": "Expression"
 						},
 						"queryTimeout": "02:00:00",
 						"partitionOption": "None"
-					},
-					"dataset": {
-						"referenceName": "DS_Folders",
-						"type": "DatasetReference",
-						"parameters": {
-							"param_staiging_Tablename": {
-								"value": "@pipeline().parameters.StagingTableName",
-								"type": "Expression"
-							}
-						}
 					},
 					"firstRowOnly": false
 				}
@@ -95,6 +85,12 @@
 							"typeProperties": {
 								"source": {
 									"type": "DelimitedTextSource",
+									"additionalColumns": [
+										{
+											"name": "FileName",
+											"value": "$$FILEPATH"
+										}
+									],
 									"storeSettings": {
 										"type": "AzureBlobFSReadSettings",
 										"recursive": true,
@@ -124,11 +120,11 @@
 									"referenceName": "DS_ADLS",
 									"type": "DatasetReference",
 									"parameters": {
-										"param_foldermame": {
+										"ParamFolderName": {
 											"value": "@pipeline().parameters.Foldername",
 											"type": "Expression"
 										},
-										"param_filename": {
+										"ParamFileName": {
 											"value": "@variables('FileName')",
 											"type": "Expression"
 										}
@@ -138,13 +134,7 @@
 							"outputs": [
 								{
 									"referenceName": "DS_Folders",
-									"type": "DatasetReference",
-									"parameters": {
-										"param_staiging_Tablename": {
-											"value": "@pipeline().parameters.StagingTableName",
-											"type": "Expression"
-										}
-									}
+									"type": "DatasetReference"
 								}
 							]
 						}
